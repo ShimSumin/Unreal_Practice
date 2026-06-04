@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "MyActorComponent.h"
 #include "Unreal_PracticeCharacter.generated.h"
 
 class USpringArmComponent;
@@ -12,6 +13,7 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+class UUserWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -49,6 +51,7 @@ public:
 	
 
 protected:
+	virtual void BeginPlay() override;
 
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
@@ -62,6 +65,22 @@ protected:
 	virtual void NotifyControllerChanged() override;
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UUserWidget> HUDWidgetClass;
+
+	UPROPERTY()
+	UUserWidget* HUDWidget;
+
+	UFUNCTION()
+	void OnHealthDamaged(float NewHealth, float MaxHealth, float HealthChange);
+
+	UFUNCTION()
+	void OnDead(AController* KillerController);
+
+	FTimerHandle DeathTimerHandle;
+
+	void HandleDeathTimer();
 
 public:
 	/** Returns CameraBoom subobject **/

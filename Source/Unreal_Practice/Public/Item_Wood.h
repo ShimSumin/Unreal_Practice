@@ -5,13 +5,13 @@
 #include "CoreMinimal.h"
 #include "ItemBase.h"
 #include "TestMyInterface.h"
-#include "Item_Cloth.generated.h"
+#include "Item_Wood.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UNREAL_PRACTICE_API AItem_Cloth : public AItemBase, public ITestMyInterface
+class UNREAL_PRACTICE_API AItem_Wood : public AItemBase, public ITestMyInterface
 {
 	GENERATED_BODY()
 

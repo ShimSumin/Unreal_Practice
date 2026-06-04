@@ -10,6 +10,9 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Blueprint/UserWidget.h"
+#include "Components/ProgressBar.h"
+#include "Components/TextBlock.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -52,6 +55,40 @@ AUnreal_PracticeCharacter::AUnreal_PracticeCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	HUDWidget = nullptr;
+
+}
+
+void AUnreal_PracticeCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (HUDWidgetClass)
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (PC)
+		{
+			HUDWidget = CreateWidget<UUserWidget>(PC, HUDWidgetClass);
+			if (HUDWidget)
+			{
+				HUDWidget->AddToViewport();
+			}
+		}
+	}
+
+	if (UMyActorComponent* HealthComp = FindComponentByClass<UMyActorComponent>())
+	{
+		// UI 업데이트
+		HealthComp->OnHealthDamaged.AddDynamic(this, &AUnreal_PracticeCharacter::OnHealthDamaged);
+		// 사망 처리
+		HealthComp->OnHealthDead.AddDynamic(this, &AUnreal_PracticeCharacter::OnDead);
+
+		OnHealthDamaged(
+			HealthComp->GetCurrentHealth(),
+			HealthComp->GetMaxHealth(),
+			0.f
+		);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -126,4 +163,61 @@ void AUnreal_PracticeCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void AUnreal_PracticeCharacter::OnHealthDamaged(float NewHealth, float MaxHealth, float HealthChange)
+{
+	if (!HUDWidget) return;
+
+	if (UProgressBar* Bar = Cast<UProgressBar>(HUDWidget->GetWidgetFromName(TEXT("HealthBar"))))
+	{
+		float Ratio = (MaxHealth > 0.f) ? (NewHealth / MaxHealth) : 0.f;
+		Bar->SetPercent(Ratio);
+
+		FLinearColor BarColor = FLinearColor::LerpUsingHSV(
+			FLinearColor::Red, FLinearColor::Green, Ratio);
+		Bar->SetFillColorAndOpacity(BarColor);
+	}
+
+	if (UTextBlock* Text = Cast<UTextBlock>(HUDWidget->GetWidgetFromName(TEXT("HealthText"))))
+	{
+		FString HPString = FString::Printf(TEXT("HP: %.0f / %.0f"), NewHealth, MaxHealth);
+		Text->SetText(FText::FromString(HPString));
+	}
+}
+
+void AUnreal_PracticeCharacter::OnDead(AController* KillerController)
+{
+
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC)
+	{
+		DisableInput(PC);
+	}
+
+	if (HUDWidget)
+	{
+		HUDWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+
+	GetWorldTimerManager().SetTimer(
+		DeathTimerHandle,
+		this,
+		&AUnreal_PracticeCharacter::HandleDeathTimer,
+		3.f,
+		false
+	);
+}
+
+void AUnreal_PracticeCharacter::HandleDeathTimer()
+{
+	Destroy();
 }
